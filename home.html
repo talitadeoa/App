@@ -1,0 +1,151 @@
+<canvas id="space"></canvas>
+
+<script>
+const canvas = document.getElementById("space");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// Carrega imagem de fundo
+const bg = new Image();
+bg.src = "background-space.png"; // <-- coloque aqui o arquivo da sua arte
+let bgLoaded = false;
+bg.onload = () => {
+  bgLoaded = true;
+};
+
+// Câmera
+let zoom = 1;
+let targetZoom = 1;
+let camX = 0;
+let camY = 0;
+let targetCamX = 0;
+let targetCamY = 0;
+let focusedItem = null;
+
+// Hotspots (posições RELATIVAS na imagem)
+// relX e relY vão de -0.5 a 0.5 (centro = 0,0)
+const items = [
+  { id: "I",   label: "Galáxia", relX: -0.20, relY: -0.05, focusZoom: 2.0 },
+  { id: "II",  label: "Luas",    relX: -0.35, relY: -0.25, focusZoom: 2.8 },
+  { id: "III", label: "Sol",     relX:  0.10, relY:  0.05, focusZoom: 3.0 },
+  { id: "IV",  label: "Planeta", relX:  0.25, relY:  0.30, focusZoom: 3.5 },
+  { id: "V",   label: "Eclipse", relX:  0.05, relY: -0.35, focusZoom: 2.8 }
+];
+// você pode ir ajustando relX/relY testando no navegador
+
+// Clique
+canvas.addEventListener("click", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const clickX = e.clientX - rect.left;
+  const clickY = e.clientY - rect.top;
+
+  let clicked = null;
+  for (const it of items) {
+    if (it.screenX === undefined) continue;
+    const dist = Math.hypot(clickX - it.screenX, clickY - it.screenY);
+    if (dist < 30) { // raio de clique
+      clicked = it;
+      break;
+    }
+  }
+
+  // clique no vazio → visão geral
+  if (!clicked) {
+    focusedItem = null;
+    targetZoom = 1;
+    targetCamX = 0;
+    targetCamY = 0;
+    return;
+  }
+
+  // se clicou de novo no mesmo → desfoca
+  if (focusedItem === clicked) {
+    focusedItem = null;
+    targetZoom = 1;
+    targetCamX = 0;
+    targetCamY = 0;
+  } else {
+    // novo foco
+    focusedItem = clicked;
+    targetZoom = clicked.focusZoom || 3.0;
+
+    if (bgLoaded) {
+      const worldX = clicked.relX * bg.width;
+      const worldY = clicked.relY * bg.height;
+
+      // centraliza o ponto (mundo) no centro da tela:
+      targetCamX = -worldX;
+      targetCamY = -worldY;
+    }
+  }
+});
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // fundo preto
+  ctx.fillStyle = "black";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (!bgLoaded) return;
+
+  ctx.save();
+
+  // centro da tela
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.scale(zoom, zoom);
+  ctx.translate(camX, camY); // câmera em coords da imagem
+
+  // desenha imagem com centro em (0,0)
+  ctx.drawImage(bg, -bg.width / 2, -bg.height / 2);
+
+  // desenha os símbolos romanos
+  ctx.font = `${40 / zoom}px Arial`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "white";
+
+  for (const it of items) {
+    const worldX = it.relX * bg.width;
+    const worldY = it.relY * bg.height;
+
+    // desenha texto na posição
+    ctx.fillText(it.id + ".", worldX, worldY);
+
+    // calcula posição na tela (fora do sistema de transformações)
+    const screenX = canvas.width / 2 + (worldX + camX) * zoom;
+    const screenY = canvas.height / 2 + (worldY + camY) * zoom;
+    it.screenX = screenX;
+    it.screenY = screenY;
+  }
+
+  ctx.restore();
+
+  // (opcional) rótulo do item focado
+  if (focusedItem) {
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(20, 20, 260, 60);
+    ctx.fillStyle = "white";
+    ctx.font = "18px Arial";
+    ctx.fillText(focusedItem.id + " - " + focusedItem.label, 30, 50);
+  }
+}
+
+function animate() {
+  // interpolação suave
+  zoom += (targetZoom - zoom) * 0.08;
+  camX += (targetCamX - camX) * 0.08;
+  camY += (targetCamY - camY) * 0.08;
+
+  draw();
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>

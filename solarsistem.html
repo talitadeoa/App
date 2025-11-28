@@ -1,0 +1,237 @@
+<canvas id="solar"></canvas>
+
+<script>
+const canvas = document.getElementById("solar");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// 🔹 APENAS 3 PLANETAS
+const planets = [
+  { name: "Mercury", radius: 80,  size: 5,  periodDays: 88,   angleOffset: 0 },
+  { name: "Earth",   radius: 140, size: 7,  periodDays: 365,  angleOffset: 1 },
+  { name: "Jupiter", radius: 220, size: 11, periodDays: 4333, angleOffset: 2 }
+];
+
+// 🔹 RAIO DO SOL (PARA DESENHO E CLIQUE)
+const SUN_RADIUS = 20;
+
+// 🔹 MAPA DE IMAGENS DE FUNDO (PLANETAS + SOL)
+const planetBackgrounds = {};
+
+function loadPlanetBg(name, src) {
+  const img = new Image();
+  const obj = { img, loaded: false };
+  img.onload = () => { obj.loaded = true; };
+  img.src = src;
+  planetBackgrounds[name] = obj;
+}
+
+// Ajuste os caminhos conforme seus arquivos
+loadPlanetBg("Sun",     "bg-sun.jpg");
+loadPlanetBg("Mercury", "bg-mercury.jpg");
+loadPlanetBg("Earth",   "bg-earth.jpg");
+loadPlanetBg("Jupiter", "bg-jupiter.jpg");
+
+// Tempo simulado
+const DAYS_PER_SECOND = 0.01;
+const startTime = performance.now();
+
+// “Câmera”
+let zoom = 1;
+let targetZoom = 1;
+let camX = 0;
+let camY = 0;
+let targetCamX = 0;
+let targetCamY = 0;
+
+// 🔹 foco pode ser null, "sun" ou um objeto planeta
+let focusedTarget = null;
+
+// para clique no Sol
+let sunScreenX = 0;
+let sunScreenY = 0;
+
+// Clique
+canvas.addEventListener("click", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const clickX = e.clientX - rect.left;
+  const clickY = e.clientY - rect.top;
+
+  let clickedPlanet = null;
+  let clickedSun = false;
+
+  // Verifica Sol primeiro
+  const distSun = Math.hypot(clickX - sunScreenX, clickY - sunScreenY);
+  if (distSun < SUN_RADIUS * zoom + 15) {
+    clickedSun = true;
+  } else {
+    // Verifica planetas
+    for (const p of planets) {
+      if (p.screenX === undefined) continue;
+      const dist = Math.hypot(clickX - p.screenX, clickY - p.screenY);
+      if (dist < p.size * zoom + 10) {
+        clickedPlanet = p;
+        break;
+      }
+    }
+  }
+
+  // Clique no vazio → visão geral
+  if (!clickedSun && !clickedPlanet) {
+    focusedTarget = null;
+    targetZoom = 1;
+    targetCamX = 0;
+    targetCamY = 0;
+    return;
+  }
+
+  // Clique no Sol
+  if (clickedSun) {
+    if (focusedTarget === "sun") {
+      // já estava focado → desfoca
+      focusedTarget = null;
+      targetZoom = 1;
+      targetCamX = 0;
+      targetCamY = 0;
+    } else {
+      focusedTarget = "sun";
+      targetZoom = 4.5;
+      targetCamX = 0;
+      targetCamY = 0;
+    }
+    return;
+  }
+
+  // Clique em planeta
+  if (focusedTarget === clickedPlanet) {
+    // já estava focado → desfoca
+    focusedTarget = null;
+    targetZoom = 1;
+    targetCamX = 0;
+    targetCamY = 0;
+  } else {
+    focusedTarget = clickedPlanet;
+    targetZoom = 4.5;
+
+    if (typeof clickedPlanet.worldX === "number" && typeof clickedPlanet.worldY === "number") {
+      targetCamX = -clickedPlanet.worldX;
+      targetCamY = -clickedPlanet.worldY;
+    }
+  }
+});
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 🔹 FUNDO: se há foco e imagem correspondente, usa
+  let bgKey = null;
+  if (focusedTarget) {
+    if (focusedTarget === "sun") {
+      bgKey = "Sun";
+    } else if (focusedTarget.name) {
+      bgKey = focusedTarget.name;
+    }
+  }
+
+  if (bgKey && planetBackgrounds[bgKey] && planetBackgrounds[bgKey].loaded) {
+    const bg = planetBackgrounds[bgKey].img;
+    ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
+  } else {
+    // fundo padrão
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  ctx.save();
+
+  // Centro da tela
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.scale(zoom, zoom);
+  ctx.translate(camX, camY);
+
+  // Tempo simulado
+  const now = performance.now();
+  const elapsedSeconds = (now - startTime) / 1000;
+  const simulatedDays = elapsedSeconds * DAYS_PER_SECOND;
+
+  // 🔹 Coordenadas de tela do Sol (para clique)
+  // Sol está em (0,0) no mundo
+  sunScreenX = canvas.width / 2 + (0 + camX) * zoom;
+  sunScreenY = canvas.height / 2 + (0 + camY) * zoom;
+
+  // 🔹 ÓRBITAS – só aparecem na visão geral
+  if (!focusedTarget) {
+    ctx.strokeStyle = "rgba(255,255,255,0.08)";
+    ctx.lineWidth = 1 / zoom;
+    for (const p of planets) {
+      ctx.beginPath();
+      ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  // 🔹 SOL – visível na visão geral ou quando o foco é o Sol
+  if (!focusedTarget || focusedTarget === "sun") {
+    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, SUN_RADIUS * 2);
+    gradient.addColorStop(0, "#fff9d9");
+    gradient.addColorStop(1, "#ffb84d");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(0, 0, SUN_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 🔹 PLANETAS
+  for (const p of planets) {
+    const orbitFraction = simulatedDays / p.periodDays;
+    const angle = orbitFraction * Math.PI * 2 + p.angleOffset;
+
+    const x = Math.cos(angle) * p.radius;
+    const y = Math.sin(angle) * p.radius;
+
+    // guarda posição no mundo
+    p.worldX = x;
+    p.worldY = y;
+
+    // decide se desenha: visão geral ou foco nesse planeta
+    const shouldDraw =
+      !focusedTarget || (focusedTarget !== "sun" && focusedTarget === p);
+
+    if (shouldDraw) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = "lightblue";
+      ctx.beginPath();
+      ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // mesmo se não desenhar, atualiza coordenadas de tela para clique
+    const screenX = canvas.width / 2 + (x + camX) * zoom;
+    const screenY = canvas.height / 2 + (y + camY) * zoom;
+    p.screenX = screenX;
+    p.screenY = screenY;
+  }
+
+  ctx.restore();
+}
+
+function animate() {
+  // interpolação suave
+  zoom += (targetZoom - zoom) * 0.08;
+  camX += (targetCamX - camX) * 0.08;
+  camY += (targetCamY - camY) * 0.08;
+
+  draw();
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>

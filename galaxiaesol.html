@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Galáxia + Órbita Detalhada</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at center, #020617 0%, #000 60%, #020617 100%);
+      overflow: hidden;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #e5e7eb;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="solar"></canvas>
+
+  <script>
+    const canvas = document.getElementById("solar");
+    const ctx = canvas.getContext("2d");
+
+    // =========================
+    // MODO DE VISÃO
+    // =========================
+    let viewMode = "galaxy";    // "galaxy" | "orbitDetail"
+    let selectedStar = null;    // planeta ou "sun"
+
+    // =========================
+    // GALÁXIA (CÓDIGO 1)
+    // =========================
+
+    // cria 4 luas para um planeta com base no tamanho dele
+    function createMoonsForPlanet(baseSize) {
+      return [
+        { orbitRadius: baseSize * 3.0, size: baseSize * 0.6, periodDays: 30,  angleOffset: 0   },
+        { orbitRadius: baseSize * 4.2, size: baseSize * 0.5, periodDays: 55,  angleOffset: 1.5 },
+        { orbitRadius: baseSize * 5.4, size: baseSize * 0.4, periodDays: 85,  angleOffset: 3.1 },
+        { orbitRadius: baseSize * 6.2, size: baseSize * 0.5, periodDays: 120, angleOffset: 4.0 }
+      ];
+    }
+
+    // PLANETAS
+    const planets = [
+      { 
+        name: "2024", radius: 80,  size: 5,  periodDays: 88,
+        angleOffset: 0, color: "#b3b3b3", spinAngle: 0,
+        moons: createMoonsForPlanet(5)
+      },
+      { 
+        name: "2025",   radius: 140, size: 7,  periodDays: 365,
+        angleOffset: 1, color: "#4fa5ff", spinAngle: 0,
+        moons: createMoonsForPlanet(7)
+      },
+      { 
+        name: "2026", radius: 220, size: 11, periodDays: 4333,
+        angleOffset: 2, color: "#f2a65a", spinAngle: 0,
+        moons: createMoonsForPlanet(11)
+      },
+      { 
+        name: "2027",  radius: 280, size: 9,  periodDays: 10759,
+        angleOffset: 0.7, color: "#f5d28a", spinAngle: 0,
+        moons: createMoonsForPlanet(9)
+      }
+    ];
+
+    const SUN_RADIUS = 20;
+    let sunSpinAngle = 0;
+
+    // MAPA DE IMAGENS DE FUNDO (não é obrigatório ter os arquivos)
+    const planetBackgrounds = {};
+
+    function loadPlanetBg(name, src) {
+      const img = new Image();
+      const obj = { img, loaded: false };
+      img.onload = () => { obj.loaded = true; };
+      img.src = src;
+      planetBackgrounds[name] = obj;
+    }
+
+    // Ajuste os caminhos conforme seus arquivos (ou comente se não for usar)
+    // loadPlanetBg("Sun",     "bg-sun.jpg");
+    // loadPlanetBg("Mercury", "bg-mercury.jpg");
+    // loadPlanetBg("Earth",   "bg-earth.jpg");
+    // loadPlanetBg("Jupiter", "bg-jupiter.jpg");
+    // loadPlanetBg("Saturn",  "bg-saturn.jpg");
+
+    // Tempo simulado
+    const DAYS_PER_SECOND = 0.01;
+    const startTime = performance.now();
+
+    // Câmera
+    let zoom = 1;
+    let targetZoom = 1;
+    let camX = 0;
+    let camY = 0;
+    let targetCamX = 0;
+    let targetCamY = 0;
+
+    // foco antigo (mantido só para giro)
+    let focusedTarget = null;
+
+    // para clique no Sol
+    let sunScreenX = 0;
+    let sunScreenY = 0;
+
+    // ESFERA COM SOMBRA / TEXTURA
+    function drawShadedSphere(radius, baseColor, spinAngle) {
+      const lightRadius = radius * 0.3;
+      const lx = Math.cos(spinAngle) * radius * 0.5;
+      const ly = Math.sin(spinAngle) * radius * 0.5;
+
+      const gradient = ctx.createRadialGradient(
+        lx, ly, lightRadius * 0.2,
+        0, 0, radius
+      );
+
+      gradient.addColorStop(0, "rgba(255,255,255,0.95)");
+      gradient.addColorStop(0.3, baseColor);
+      gradient.addColorStop(0.8, shadeColor(baseColor, -30));
+      gradient.addColorStop(1, "rgba(0,0,0,0.9)");
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // texturinha leve
+      ctx.save();
+      ctx.clip();
+      ctx.globalAlpha = 0.15;
+      ctx.lineWidth = radius * 0.15;
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.beginPath();
+      ctx.arc(0, radius * 0.3, radius * 0.9, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // escurece cor
+    function shadeColor(hex, percent) {
+      const num = parseInt(hex.slice(1), 16);
+      let r = (num >> 16) & 255;
+      let g = (num >> 8) & 255;
+      let b = num & 255;
+
+      r = Math.min(255, Math.max(0, r + (255 * percent / 100)));
+      g = Math.min(255, Math.max(0, g + (255 * percent / 100)));
+      b = Math.min(255, Math.max(0, b + (255 * percent / 100)));
+
+      return `rgb(${r},${g},${b})`;
+    }
+
+    function drawGalaxyScene() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // FUNDO simples
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(zoom, zoom);
+      ctx.translate(camX, camY);
+
+      const now = performance.now();
+      const elapsedSeconds = (now - startTime) / 1000;
+      const simulatedDays = elapsedSeconds * DAYS_PER_SECOND;
+
+      // Coordenadas de tela do Sol (para clique)
+      sunScreenX = canvas.width / 2 + (0 + camX) * zoom;
+      sunScreenY = canvas.height / 2 + (0 + camY) * zoom;
+
+      // ÓRBITAS GERAIS
+      ctx.strokeStyle = "rgba(255,255,255,0.18)";
+      ctx.lineWidth = 1.2 / zoom;
+      for (const p of planets) {
+        ctx.beginPath();
+        ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // SOL
+      ctx.save();
+      drawShadedSphere(SUN_RADIUS, "#ffcc66", sunSpinAngle);
+      ctx.restore();
+
+      // PLANETAS + ÓRBITAS DAS LUAS + LUAS
+      for (const p of planets) {
+        const orbitFraction = simulatedDays / p.periodDays;
+        const angle = orbitFraction * Math.PI * 2 + p.angleOffset;
+
+        const x = Math.cos(angle) * p.radius;
+        const y = Math.sin(angle) * p.radius;
+
+        p.worldX = x;
+        p.worldY = y;
+
+        // uma lua na visão geral
+        const moonsToDraw = p.moons.length > 0 ? [p.moons[0]] : [];
+
+        // órbita da lua
+        if (moonsToDraw.length > 0) {
+          ctx.save();
+          ctx.strokeStyle = "rgba(255,255,255,0.45)";
+          ctx.lineWidth = 1 / zoom;
+          for (const moon of moonsToDraw) {
+            ctx.beginPath();
+            ctx.arc(x, y, moon.orbitRadius, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        // planeta
+        ctx.save();
+        ctx.translate(x, y);
+        drawShadedSphere(p.size, p.color, p.spinAngle);
+        ctx.restore();
+
+        // luas
+        for (const moon of moonsToDraw) {
+          const mOrbitFraction = simulatedDays / moon.periodDays;
+          const mAngle = mOrbitFraction * Math.PI * 2 + moon.angleOffset;
+
+          const mx = x + Math.cos(mAngle) * moon.orbitRadius;
+          const my = y + Math.sin(mAngle) * moon.orbitRadius;
+
+          ctx.save();
+          ctx.translate(mx, my);
+          drawShadedSphere(moon.size, "#d0d0d0", p.spinAngle + mAngle);
+          ctx.restore();
+        }
+
+        // coordenadas para clique
+        const screenX = canvas.width / 2 + (x + camX) * zoom;
+        const screenY = canvas.height / 2 + (y + camY) * zoom;
+        p.screenX = screenX;
+        p.screenY = screenY;
+      }
+
+      ctx.restore();
+
+      // dica de interação
+      ctx.save();
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.font = "14px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Clique em um planeta ou no Sol para ver a órbita detalhada", canvas.width / 2, canvas.height - 20);
+      ctx.restore();
+    }
+
+    function cameraAlmostAtTarget() {
+      const dz  = Math.abs(targetZoom - zoom);
+      const dcx = Math.abs(targetCamX - camX);
+      const dcy = Math.abs(targetCamY - camY);
+      return dz < 0.02 && dcx < 2 && dcy < 2;
+    }
+
+    // =========================
+    // ÓRBITA DETALHADA (CÓDIGO 2 ADAPTADO)
+    // =========================
+    const orbitConfig = {
+      earthOrbitRadius: 220,
+      moonOrbitRadius: 70,
+      starCount: 200,
+      orbit: {
+        lineWidthBase: 0.8,
+        lineWidthHighlight: 2
+      },
+      speed: {
+        earthSegment: 0.01,
+        moonAngular: 0.02
+      },
+      staticMoons: {
+        angles: [
+          0,
+          Math.PI / 2,
+          Math.PI,
+          3 * Math.PI / 2
+        ],
+        phases: [
+          "new",
+          "firstQuarter",
+          "full",
+          "lastQuarter"
+        ],
+        radius: 9
+      }
+    };
+
+    const orbitColors = {
+      orbitBase: "rgba(56, 189, 248, 0.25)",
+      orbitHighlight: "#38bdf8",
+      stars: "white",
+      sunGlowInner: "rgba(255, 255, 255, 0.95)",
+      sunGlowMid: "rgba(190, 235, 255, 0.9)",
+      sunGlowOuter: "rgba(15, 23, 42, 0)",
+      sunCore: "#f9fafb",
+      earth: "rgba(14, 165, 233, 1)",
+      moon: "rgba(224, 242, 254, 1)",
+      label: "rgba(229, 231, 235, 1)",
+      grid: "rgba(148, 163, 184, 0.25)",
+      moonDark: "rgba(15,23,42,0.95)",
+      moonLight: "rgba(248,250,252,0.95)"
+    };
+
+    const orbitState = {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      centerX: window.innerWidth / 2,
+      centerY: window.innerHeight / 2,
+      stars: [],
+      earthAngle: 0,
+      moonPhase: 0,
+      activeCell: null,
+      segmentT: 0
+    };
+
+    function generateOrbitStars() {
+      orbitState.stars = [];
+      for (let i = 0; i < orbitConfig.starCount; i++) {
+        orbitState.stars.push({
+          x: Math.random() * orbitState.width,
+          y: Math.random() * orbitState.height,
+          r: Math.random() * 1.1,
+          alpha: 0.2 + Math.random() * 0.8
+        });
+      }
+    }
+
+    function getCellFromCoords(x, y) {
+      const top = y < orbitState.centerY;
+      const left = x < orbitState.centerX;
+
+      if (top && left) return "A1";
+      if (top && !left) return "A2";
+      if (!top && left) return "B1";
+      return "B2";
+    }
+
+    function getArcRangeForCell(cell) {
+      switch (cell) {
+        case "A1": return [Math.PI, 3 * Math.PI / 2];
+        case "A2": return [3 * Math.PI / 2, 2 * Math.PI];
+        case "B1": return [Math.PI / 2, Math.PI];
+        case "B2": return [0, Math.PI / 2];
+        default: return null;
+      }
+    }
+
+    function drawOrbitBackground() {
+      ctx.save();
+      ctx.fillStyle = orbitColors.stars;
+      for (const s of orbitState.stars) {
+        ctx.globalAlpha = s.alpha;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+
+    function drawOrbitSun() {
+      const radius = 40;
+      ctx.save();
+      const gradient = ctx.createRadialGradient(
+        orbitState.centerX, orbitState.centerY, 0,
+        orbitState.centerX, orbitState.centerY, radius * 4
+      );
+      gradient.addColorStop(0, orbitColors.sunGlowInner);
+      gradient.addColorStop(0.2, orbitColors.sunGlowMid);
+      gradient.addColorStop(1, orbitColors.sunGlowOuter);
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(orbitState.centerX, orbitState.centerY, radius * 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.shadowBlur = 25;
+      ctx.shadowColor = "#e0f2fe";
+      ctx.fillStyle = orbitColors.sunCore;
+      ctx.beginPath();
+      ctx.arc(orbitState.centerX, orbitState.centerY, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawEarthOrbit(highlightCell) {
+      ctx.save();
+      ctx.lineWidth = orbitConfig.orbit.lineWidthBase;
+      ctx.strokeStyle = orbitColors.orbitBase;
+      ctx.beginPath();
+      ctx.arc(orbitState.centerX, orbitState.centerY, orbitConfig.earthOrbitRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      if (!highlightCell) return;
+      const range = getArcRangeForCell(highlightCell);
+      if (!range) return;
+
+      ctx.save();
+      ctx.lineWidth = orbitConfig.orbit.lineWidthHighlight;
+      ctx.strokeStyle = orbitColors.orbitHighlight;
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = orbitColors.orbitHighlight;
+      ctx.beginPath();
+      ctx.arc(orbitState.centerX, orbitState.centerY, orbitConfig.earthOrbitRadius, range[0], range[1]);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function getEarthPosition(angle) {
+      const x = orbitState.centerX + orbitConfig.earthOrbitRadius * Math.cos(angle);
+      const y = orbitState.centerY + orbitConfig.earthOrbitRadius * Math.sin(angle);
+      return { x, y, angle };
+    }
+
+    function getMoonPosition(phase, earthPos) {
+      const x = earthPos.x + orbitConfig.moonOrbitRadius * Math.cos(phase);
+      const y = earthPos.y + orbitConfig.moonOrbitRadius * Math.sin(phase);
+      return { x, y };
+    }
+
+    function drawMoonPhase(x, y, radius, phase) {
+      ctx.save();
+      ctx.translate(x, y);
+
+      // base escura
+      ctx.fillStyle = orbitColors.moonDark;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (phase === "new") {
+        ctx.restore();
+        return;
+      }
+
+      // disco iluminado
+      ctx.fillStyle = orbitColors.moonLight;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (phase === "full") {
+        ctx.restore();
+        return;
+      }
+
+      ctx.fillStyle = orbitColors.moonDark;
+      const offset = (phase === "firstQuarter") ? -radius * 0.6 : radius * 0.6;
+      ctx.beginPath();
+      ctx.arc(offset, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawStaticMoonsOnEarthOrbit() {
+      ctx.save();
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = "rgba(148, 163, 184, 0.9)";
+
+      const { angles, phases, radius } = orbitConfig.staticMoons;
+
+      for (let i = 0; i < angles.length; i++) {
+        const angle = angles[i];
+        const phase = phases[i];
+
+        const x = orbitState.centerX + orbitConfig.earthOrbitRadius * Math.cos(angle);
+        const y = orbitState.centerY + orbitConfig.earthOrbitRadius * Math.sin(angle);
+
+        drawMoonPhase(x, y, radius, phase);
+      }
+
+      ctx.restore();
+    }
+
+    function drawLabel(text, x, y, align = "center", baseline = "bottom", alpha = 1) {
+      ctx.save();
+      ctx.fillStyle = `rgba(229, 231, 235, ${alpha})`;
+      ctx.font = "14px system-ui, sans-serif";
+      ctx.textAlign = align;
+      ctx.textBaseline = baseline;
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    }
+
+    function drawOrbitGridLines() {
+      ctx.save();
+      ctx.strokeStyle = orbitColors.grid;
+      ctx.lineWidth = 1;
+
+      // vertical
+      ctx.beginPath();
+      ctx.moveTo(orbitState.centerX, 0);
+      ctx.lineTo(orbitState.centerX, orbitState.height);
+      ctx.stroke();
+
+      // horizontal
+      ctx.beginPath();
+      ctx.moveTo(0, orbitState.centerY);
+      ctx.lineTo(orbitState.width, orbitState.centerY);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawEarthAndMoon(earthPos, moonPos, highlighted) {
+      const alphaBase = highlighted ? 1 : 0.4;
+      const alphaLabels = highlighted ? 1 : 0.5;
+
+      ctx.save();
+
+      // Órbita da Lua
+      ctx.lineWidth = 0.7;
+      ctx.strokeStyle = `rgba(125, 211, 252, ${0.3 * alphaBase})`;
+      ctx.beginPath();
+      ctx.arc(earthPos.x, earthPos.y, orbitConfig.moonOrbitRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Terra
+      ctx.shadowBlur = highlighted ? 14 : 4;
+      ctx.shadowColor = orbitColors.orbitHighlight;
+      ctx.fillStyle = orbitColors.earth;
+      ctx.beginPath();
+      ctx.arc(earthPos.x, earthPos.y, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+      drawLabel("Earth", earthPos.x, earthPos.y - 14, "center", "bottom", alphaLabels);
+
+      // Lua
+      ctx.shadowBlur = highlighted ? 16 : 5;
+      ctx.shadowColor = "#bae6fd";
+      ctx.fillStyle = orbitColors.moon;
+      ctx.beginPath();
+      ctx.arc(moonPos.x, moonPos.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+      drawLabel("Moon", moonPos.x, moonPos.y - 18, "center", "bottom", alphaLabels);
+
+      ctx.restore();
+    }
+
+    function updateOrbitDetail() {
+      if (!orbitState.activeCell) return;
+
+      const range = getArcRangeForCell(orbitState.activeCell);
+      if (!range) return;
+
+      const [start, end] = range;
+
+      if (orbitState.segmentT < 1) {
+        orbitState.segmentT += orbitConfig.speed.earthSegment;
+        if (orbitState.segmentT > 1) orbitState.segmentT = 1;
+      }
+
+      orbitState.earthAngle = start + orbitState.segmentT * (end - start);
+      orbitState.moonPhase += orbitConfig.speed.moonAngular;
+    }
+
+    function drawOrbitDetailScene() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      drawOrbitBackground();
+      drawOrbitSun();
+      drawOrbitGridLines();
+      drawEarthOrbit(orbitState.activeCell);
+      drawStaticMoonsOnEarthOrbit();
+
+      if (orbitState.activeCell) {
+        const earthPos = getEarthPosition(orbitState.earthAngle);
+        const moonPos = getMoonPosition(orbitState.moonPhase, earthPos);
+        drawEarthAndMoon(earthPos, moonPos, true);
+      }
+
+      // nome da estrela selecionada
+      if (selectedStar) {
+        ctx.save();
+        ctx.fillStyle = "#e5e7eb";
+        ctx.font = "16px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        const label =
+          typeof selectedStar === "string" ? "Sun" : selectedStar.name;
+        ctx.fillText(label, orbitState.centerX, orbitState.height - 60);
+        ctx.fillText("Clique para voltar à galáxia", orbitState.centerX, orbitState.height - 30);
+        ctx.restore();
+      }
+    }
+
+    // =========================
+    // RESIZE (agora DEPOIS de orbitState existir)
+    // =========================
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      orbitState.width = canvas.width;
+      orbitState.height = canvas.height;
+      orbitState.centerX = canvas.width / 2;
+      orbitState.centerY = canvas.height / 2;
+
+      generateOrbitStars();
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    // =========================
+    // INPUT (CLIQUE + MOUSE)
+    // =========================
+
+    // Clique geral
+    canvas.addEventListener("click", (e) => {
+      // Se estiver no modo detalhe, qualquer clique volta pra galáxia
+      if (viewMode === "orbitDetail") {
+        viewMode = "galaxy";
+        selectedStar = null;
+        orbitState.activeCell = null;
+        return;
+      }
+
+      // Modo galáxia: detectar Sol ou planetas
+      const rect = canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      let clickedPlanet = null;
+      let clickedSun = false;
+
+      const distSun = Math.hypot(clickX - sunScreenX, clickY - sunScreenY);
+      if (distSun < SUN_RADIUS * zoom + 15) {
+        clickedSun = true;
+      } else {
+        for (const p of planets) {
+          if (p.screenX === undefined) continue;
+          const dist = Math.hypot(clickX - p.screenX, clickY - p.screenY);
+          if (dist < p.size * zoom + 10) {
+            clickedPlanet = p;
+            break;
+          }
+        }
+      }
+
+      // Clique no vazio → nada
+      if (!clickedSun && !clickedPlanet) {
+        return;
+      }
+
+      // Entrar no modo detalhe
+      viewMode = "orbitDetail";
+      selectedStar = clickedSun ? "sun" : clickedPlanet;
+
+      // "reseta" câmera da galáxia
+      focusedTarget = null;
+      targetZoom = 1;
+      targetCamX = 0;
+      targetCamY = 0;
+    });
+
+    // Mouse move/leave para quadrantes do orbit
+    canvas.addEventListener("mousemove", (e) => {
+      if (viewMode !== "orbitDetail") return;
+
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      const cell = getCellFromCoords(x, y);
+      if (cell !== orbitState.activeCell) {
+        orbitState.activeCell = cell;
+        orbitState.segmentT = 0;
+      }
+    });
+
+    canvas.addEventListener("mouseleave", () => {
+      if (viewMode !== "orbitDetail") return;
+      orbitState.activeCell = null;
+    });
+
+    // =========================
+    // DRAW WRAPPER + ANIMAÇÃO
+    // =========================
+    function draw() {
+      if (viewMode === "galaxy") {
+        drawGalaxyScene();
+      } else {
+        drawOrbitDetailScene();
+      }
+    }
+
+    function animate() {
+      if (viewMode === "galaxy") {
+        zoom += (targetZoom - zoom) * 0.08;
+        camX += (targetCamX - camX) * 0.08;
+        camY += (targetCamY - camY) * 0.08;
+
+        const almostAtTarget = cameraAlmostAtTarget();
+
+        if (!focusedTarget) {
+          sunSpinAngle += 0.02;
+          for (const p of planets) {
+            p.spinAngle += 0.02;
+          }
+        } else {
+          if (focusedTarget === "sun") {
+            if (!almostAtTarget) {
+              sunSpinAngle += 0.2;
+            }
+          } else {
+            for (const p of planets) {
+              if (p === focusedTarget && !almostAtTarget) {
+                p.spinAngle += 0.2;
+              }
+            }
+          }
+        }
+      } else if (viewMode === "orbitDetail") {
+        updateOrbitDetail();
+      }
+
+      draw();
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

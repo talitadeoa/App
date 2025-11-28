@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Órbita em 4 partes (A1 A2 B1 B2)</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at center, #020617 0%, #000 60%, #020617 100%);
+      overflow: hidden;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #e5e7eb;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="orbitCanvas"></canvas>
+
+  <script>
+    // =========================
+    // Configuração
+    // =========================
+    const config = {
+      earthOrbitRadius: 220,
+      moonOrbitRadius: 70,
+      starCount: 200,
+
+      orbit: {
+        lineWidthBase: 0.8,
+        lineWidthHighlight: 2
+      },
+
+      speed: {
+        earthSegment: 0.01,   // 0–1 dentro do arco
+        moonAngular: 0.02
+      },
+
+      staticMoons: {
+        angles: [
+          0,                 // direita
+          Math.PI / 2,       // cima
+          Math.PI,           // esquerda
+          3 * Math.PI / 2    // baixo
+        ],
+        phases: [
+          "new",            // Lua Nova
+          "firstQuarter",   // Quarto Crescente
+          "full",           // Cheia
+          "lastQuarter"     // Quarto Minguante
+        ],
+        radius: 9
+      }
+    };
+
+    const colors = {
+      orbitBase: "rgba(56, 189, 248, 0.25)",
+      orbitHighlight: "#38bdf8",
+      stars: "white",
+      sunGlowInner: "rgba(255, 255, 255, 0.95)",
+      sunGlowMid: "rgba(190, 235, 255, 0.9)",
+      sunGlowOuter: "rgba(15, 23, 42, 0)",
+      sunCore: "#f9fafb",
+      earth: "rgba(14, 165, 233, 1)",
+      moon: "rgba(224, 242, 254, 1)",
+      label: "rgba(229, 231, 235, 1)",
+      grid: "rgba(148, 163, 184, 0.25)",
+      moonDark: "rgba(15,23,42,0.95)",
+      moonLight: "rgba(248,250,252,0.95)"
+    };
+
+    // =========================
+    // Estado global
+    // =========================
+    const canvas = document.getElementById("orbitCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const state = {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      centerX: window.innerWidth / 2,
+      centerY: window.innerHeight / 2,
+
+      stars: [],
+
+      earthAngle: 0,
+      moonPhase: 0,
+
+      activeCell: null,  // "A1", "A2", "B1", "B2" ou null
+      segmentT: 0,       // 0 -> borda inicial, 1 -> borda final
+
+      lastTime: 0
+    };
+
+    // =========================
+    // Inicialização
+    // =========================
+    function init() {
+      handleResize();
+      window.addEventListener("resize", handleResize);
+      canvas.addEventListener("mousemove", handleMouseMove);
+      canvas.addEventListener("mouseleave", handleMouseLeave);
+
+      requestAnimationFrame(loop);
+    }
+
+    // =========================
+    // Input
+    // =========================
+    function handleResize() {
+      state.width = window.innerWidth;
+      state.height = window.innerHeight;
+      state.centerX = state.width / 2;
+      state.centerY = state.height / 2;
+
+      canvas.width = state.width;
+      canvas.height = state.height;
+
+      generateStars();
+    }
+
+    function handleMouseMove(e) {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      const cell = getCellFromCoords(x, y);
+      if (cell !== state.activeCell) {
+        state.activeCell = cell;
+        state.segmentT = 0; // recomeça no início do arco
+      }
+    }
+
+    function handleMouseLeave() {
+      state.activeCell = null;
+    }
+
+    // =========================
+    // Helpers de quadrante
+    // =========================
+    function getCellFromCoords(x, y) {
+      const top = y < state.centerY;
+      const left = x < state.centerX;
+
+      if (top && left) return "A1";
+      if (top && !left) return "A2";
+      if (!top && left) return "B1";
+      return "B2";
+    }
+
+    // A2: [0, π/2), A1: [π/2, π), B1: [π, 3π/2), B2: [3π/2, 2π)
+    function getArcRangeForCell(cell) {
+      switch (cell) {
+    case "A1": return [Math.PI, 3 * Math.PI / 2];       // topo-esquerda
+    case "A2": return [3 * Math.PI / 2, 2 * Math.PI];   // topo-direita
+    case "B1": return [Math.PI / 2, Math.PI];           // baixo-esquerda
+    case "B2": return [0, Math.PI / 2]; 
+        default: return null;
+      }
+    }
+
+    // =========================
+    // Estrelas de fundo
+    // =========================
+    function generateStars() {
+      state.stars = [];
+      for (let i = 0; i < config.starCount; i++) {
+        state.stars.push({
+          x: Math.random() * state.width,
+          y: Math.random() * state.height,
+          r: Math.random() * 1.1,
+          alpha: 0.2 + Math.random() * 0.8
+        });
+      }
+    }
+
+    function drawBackground() {
+      ctx.save();
+      ctx.fillStyle = colors.stars;
+
+      for (const s of state.stars) {
+        ctx.globalAlpha = s.alpha;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+
+    // =========================
+    // Sol
+    // =========================
+    function drawSun() {
+      const radius = 40;
+
+      ctx.save();
+      const gradient = ctx.createRadialGradient(
+        state.centerX, state.centerY, 0,
+        state.centerX, state.centerY, radius * 4
+      );
+      gradient.addColorStop(0, colors.sunGlowInner);
+      gradient.addColorStop(0.2, colors.sunGlowMid);
+      gradient.addColorStop(1, colors.sunGlowOuter);
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(state.centerX, state.centerY, radius * 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.shadowBlur = 25;
+      ctx.shadowColor = "#e0f2fe";
+      ctx.fillStyle = colors.sunCore;
+      ctx.beginPath();
+      ctx.arc(state.centerX, state.centerY, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // =========================
+    // Órbita da Terra
+    // =========================
+    function drawEarthOrbit(highlightCell) {
+      // órbita base
+      ctx.save();
+      ctx.lineWidth = config.orbit.lineWidthBase;
+      ctx.strokeStyle = colors.orbitBase;
+      ctx.beginPath();
+      ctx.arc(state.centerX, state.centerY, config.earthOrbitRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      if (!highlightCell) return;
+
+      const range = getArcRangeForCell(highlightCell);
+      if (!range) return;
+
+      ctx.save();
+      ctx.lineWidth = config.orbit.lineWidthHighlight;
+      ctx.strokeStyle = colors.orbitHighlight;
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = colors.orbitHighlight;
+      ctx.beginPath();
+      ctx.arc(state.centerX, state.centerY, config.earthOrbitRadius, range[0], range[1]);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // =========================
+    // Posições
+    // =========================
+    function getEarthPosition(angle) {
+      const x = state.centerX + config.earthOrbitRadius * Math.cos(angle);
+      const y = state.centerY + config.earthOrbitRadius * Math.sin(angle);
+      return { x, y, angle };
+    }
+
+    function getMoonPosition(phase, earthPos) {
+      const x = earthPos.x + config.moonOrbitRadius * Math.cos(phase);
+      const y = earthPos.y + config.moonOrbitRadius * Math.sin(phase);
+      return { x, y };
+    }
+
+    // =========================
+    // Desenho de fases da Lua
+    // =========================
+    function drawMoonPhase(x, y, radius, phase) {
+      ctx.save();
+      ctx.translate(x, y);
+
+      // base escura
+      ctx.fillStyle = colors.moonDark;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (phase === "new") {
+        ctx.restore();
+        return;
+      }
+
+      // disco iluminado
+      ctx.fillStyle = colors.moonLight;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (phase === "full") {
+        ctx.restore();
+        return;
+      }
+
+      // "comendo" metade do disco para quarto crescente/minguante
+      ctx.fillStyle = colors.moonDark;
+      const offset = (phase === "firstQuarter") ? -radius * 0.6 : radius * 0.6;
+      ctx.beginPath();
+      ctx.arc(offset, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // =========================
+    // 4 luas estáticas na órbita da Terra
+    // =========================
+    function drawStaticMoonsOnEarthOrbit() {
+      ctx.save();
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = "rgba(148, 163, 184, 0.9)";
+
+      const { angles, phases, radius } = config.staticMoons;
+
+      for (let i = 0; i < angles.length; i++) {
+        const angle = angles[i];
+        const phase = phases[i];
+
+        const x = state.centerX + config.earthOrbitRadius * Math.cos(angle);
+        const y = state.centerY + config.earthOrbitRadius * Math.sin(angle);
+
+        drawMoonPhase(x, y, radius, phase);
+      }
+
+      ctx.restore();
+    }
+
+    // =========================
+    // Helpers de desenho
+    // =========================
+    function drawLabel(text, x, y, align = "center", baseline = "bottom", alpha = 1) {
+      ctx.save();
+      ctx.fillStyle = `rgba(229, 231, 235, ${alpha})`;
+      ctx.font = "14px system-ui, sans-serif";
+      ctx.textAlign = align;
+      ctx.textBaseline = baseline;
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    }
+
+    function drawGridLines() {
+      ctx.save();
+      ctx.strokeStyle = colors.grid;
+      ctx.lineWidth = 1;
+
+      // linha vertical
+      ctx.beginPath();
+      ctx.moveTo(state.centerX, 0);
+      ctx.lineTo(state.centerX, state.height);
+      ctx.stroke();
+
+      // linha horizontal
+      ctx.beginPath();
+      ctx.moveTo(0, state.centerY);
+      ctx.lineTo(state.width, state.centerY);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // =========================
+    // Terra e Lua animada
+    // =========================
+    function drawEarthAndMoon(earthPos, moonPos, highlighted) {
+      const alphaBase = highlighted ? 1 : 0.4;
+      const alphaLabels = highlighted ? 1 : 0.5;
+
+      ctx.save();
+
+      // Órbita da Lua
+      ctx.lineWidth = 0.7;
+      ctx.strokeStyle = `rgba(125, 211, 252, ${0.3 * alphaBase})`;
+      ctx.beginPath();
+      ctx.arc(earthPos.x, earthPos.y, config.moonOrbitRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Terra
+      ctx.shadowBlur = highlighted ? 14 : 4;
+      ctx.shadowColor = colors.orbitHighlight;
+      ctx.fillStyle = colors.earth;
+      ctx.beginPath();
+      ctx.arc(earthPos.x, earthPos.y, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Label Earth
+      ctx.shadowBlur = 0;
+      drawLabel("Earth", earthPos.x, earthPos.y - 14, "center", "bottom", alphaLabels);
+
+      // Lua (principal, animada)
+      ctx.shadowBlur = highlighted ? 16 : 5;
+      ctx.shadowColor = "#bae6fd";
+      ctx.fillStyle = colors.moon;
+      ctx.beginPath();
+      ctx.arc(moonPos.x, moonPos.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Label Moon
+      ctx.shadowBlur = 0;
+      drawLabel("Moon", moonPos.x, moonPos.y - 18, "center", "bottom", alphaLabels);
+
+      ctx.restore();
+    }
+
+    // =========================
+    // Update & Draw
+    // =========================
+    function update(deltaMs) {
+      if (!state.activeCell) return;
+
+      const range = getArcRangeForCell(state.activeCell);
+      if (!range) return;
+
+      const [start, end] = range;
+
+      // segmentT vai de 0 -> 1 e PARA na borda final
+      if (state.segmentT < 1) {
+        state.segmentT += config.speed.earthSegment;
+        if (state.segmentT > 1) state.segmentT = 1;
+      }
+
+      // ângulo da Terra dentro do arco
+      state.earthAngle = start + state.segmentT * (end - start);
+
+      // Lua orbita continuamente
+      state.moonPhase += config.speed.moonAngular;
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, state.width, state.height);
+
+      drawBackground();
+      drawSun();
+      drawGridLines();
+      drawEarthOrbit(state.activeCell);
+      drawStaticMoonsOnEarthOrbit();
+
+      if (state.activeCell) {
+        const earthPos = getEarthPosition(state.earthAngle);
+        const moonPos = getMoonPosition(state.moonPhase, earthPos);
+        drawEarthAndMoon(earthPos, moonPos, true);
+      }
+    }
+
+    // =========================
+    // Loop principal
+    // =========================
+    function loop(timestamp) {
+      const delta = state.lastTime ? (timestamp - state.lastTime) : 16;
+      state.lastTime = timestamp;
+
+      update(delta);
+      draw();
+
+      requestAnimationFrame(loop);
+    }
+
+    // Start ✨
+    init();
+  </script>
+</body>
+</html>
