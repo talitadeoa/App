@@ -2,8 +2,8 @@
 import { useState } from "react";
 
 // importe as imagens (ajuste os caminhos dos arquivos)
-// import imgSpace from "./img/space-earth-moon-sun.jpg";  // imagem 1
-// import imgEarth from "./img/earth-sunrise.jpg";         // imagem 2
+ import imgSpace from "./space-earth-moon-sun.jpg";  // imagem 1
+ import imgEarth from "./img/earth-sunrise.jpg";         // imagem 2
 
 export default function SpaceScene() {
   const [view, setView] = useState("space"); // 'space' ou 'earth'
