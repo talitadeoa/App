@@ -3,10 +3,10 @@ import "./styles.css";
 
 import { SCREENS } from "./constants/screens";
 
-import HomeScreen from "./screens/Home";
+import HomeScreen from "./screens/HomeScreen";
 import ScreenWrapper from "./components/ScreenWrapper";
 
-import GalaxiaScreen from "./screens/Galaxia";
+import GalaxiaScreen from "./screens/GalaxiaScreen";
 import LuasScreen from "./screens/LuasScreen";
 import SolScreen from "./screens/SolScreen";
 import TerraScreen from "./screens/TerraScreen";
