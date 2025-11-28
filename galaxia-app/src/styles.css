@@ -197,3 +197,78 @@
   backdrop-filter: blur(6px);
   pointer-events: none;
 }
+/* SpaceScene.css */
+.scene-container {
+  width: 100%;
+  min-height: 100vh;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scene-wrapper {
+  position: relative;
+  max-width: 736px; /* parecido com a resolução que você mandou */
+  width: 100%;
+}
+
+.scene-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+/* Botões invisíveis sobre a imagem */
+.hotspot {
+  position: absolute;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  /* área clicável circular */
+  border-radius: 50%;
+  /* ajuda a ver enquanto ajusta: */
+  /* outline: 1px solid rgba(0, 255, 255, 0.5); */
+}
+
+/* Ajuste as porcentagens conforme o layout da sua imagem 1 */
+
+/* Terra – canto inferior esquerdo */
+.hotspot-earth {
+  width: 35%;
+  height: 35%;
+  left: 0%;
+  bottom: 0%;
+}
+
+/* Lua – no meio da imagem, mais pra cima */
+.hotspot-moon {
+  width: 18%;
+  height: 18%;
+  left: 40%;
+  top: 30%;
+}
+
+/* Sol – parte superior direita */
+.hotspot-sun {
+  width: 20%;
+  height: 20%;
+  right: 10%;
+  top: 5%;
+}
+
+/* Tela 2: botão de voltar */
+.back-button {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  padding: 8px 14px;
+  border-radius: 99px;
+  border: none;
+  font-size: 0.9rem;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}

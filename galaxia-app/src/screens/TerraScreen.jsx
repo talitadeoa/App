@@ -1,3 +1,5 @@
+import SpaceScene from "../components/SpaceScene";
+
 export default function TerraScreen() {
   return (
     <>
@@ -5,6 +7,7 @@ export default function TerraScreen() {
       <p>
         Rotação, translação, ângulo do eixo, visualizações de dia/noite, etc.
       </p>
+      <SpaceScene />
     </>
   );
 }
