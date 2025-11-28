@@ -1,0 +1,437 @@
+<canvas id="solar"></canvas>
+
+<script>
+const canvas = document.getElementById("solar");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// 🔹 cria 4 luas para um planeta com base no tamanho dele
+function createMoonsForPlanet(baseSize) {
+  return [
+    { orbitRadius: baseSize * 3.0, size: baseSize * 0.6, periodDays: 30,  angleOffset: 0   },
+    { orbitRadius: baseSize * 4.2, size: baseSize * 0.5, periodDays: 55,  angleOffset: 1.5 },
+    { orbitRadius: baseSize * 5.4, size: baseSize * 0.4, periodDays: 85,  angleOffset: 3.1 },
+    { orbitRadius: baseSize * 6.2, size: baseSize * 0.5, periodDays: 120, angleOffset: 4.0 }
+  ];
+}
+
+// 🔹 4 PLANETAS + COR + ÂNGULO DE GIRO + LUAS
+const planets = [
+  { 
+    name: "Mercury", radius: 80,  size: 5,  periodDays: 88,
+    angleOffset: 0, color: "#b3b3b3", spinAngle: 0,
+    moons: createMoonsForPlanet(5)
+  },
+  { 
+    name: "Earth",   radius: 140, size: 7,  periodDays: 365,
+    angleOffset: 1, color: "#4fa5ff", spinAngle: 0,
+    moons: createMoonsForPlanet(7)
+  },
+  { 
+    name: "Jupiter", radius: 220, size: 11, periodDays: 4333,
+    angleOffset: 2, color: "#f2a65a", spinAngle: 0,
+    moons: createMoonsForPlanet(11)
+  },
+  { 
+    name: "Saturn",  radius: 280, size: 9,  periodDays: 10759,
+    angleOffset: 0.7, color: "#f5d28a", spinAngle: 0,
+    moons: createMoonsForPlanet(9)
+  }
+];
+
+const SUN_RADIUS = 20;
+let sunSpinAngle = 0;
+
+// 🔹 MAPA DE IMAGENS DE FUNDO (PLANETAS + SOL)
+const planetBackgrounds = {};
+
+function loadPlanetBg(name, src) {
+  const img = new Image();
+  const obj = { img, loaded: false };
+  img.onload = () => { obj.loaded = true; };
+  img.src = src;
+  planetBackgrounds[name] = obj;
+}
+
+// Ajuste os caminhos conforme seus arquivos
+loadPlanetBg("Sun",     "bg-sun.jpg");
+loadPlanetBg("Mercury", "bg-mercury.jpg");
+loadPlanetBg("Earth",   "bg-earth.jpg");
+loadPlanetBg("Jupiter", "bg-jupiter.jpg");
+loadPlanetBg("Saturn",  "bg-saturn.jpg");
+
+// Tempo simulado
+const DAYS_PER_SECOND = 0.01;
+const startTime = performance.now();
+
+// “Câmera”
+let zoom = 1;
+let targetZoom = 1;
+let camX = 0;
+let camY = 0;
+let targetCamX = 0;
+let targetCamY = 0;
+
+// 🔹 foco pode ser null, "sun", objeto planeta OU objeto lua ⭐
+let focusedTarget = null;
+
+// para clique no Sol
+let sunScreenX = 0;
+let sunScreenY = 0;
+
+// Clique
+canvas.addEventListener("click", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const clickX = e.clientX - rect.left;
+  const clickY = e.clientY - rect.top;
+
+  let clickedPlanet = null;
+  let clickedMoon = null;   // ⭐ NOVO
+  let clickedSun = false;
+
+  // Verifica Sol
+  const distSun = Math.hypot(clickX - sunScreenX, clickY - sunScreenY);
+  if (distSun < SUN_RADIUS * zoom + 15) {
+    clickedSun = true;
+  } else {
+    // Verifica planetas
+    for (const p of planets) {
+      if (p.screenX === undefined) continue;
+      const dist = Math.hypot(clickX - p.screenX, clickY - p.screenY);
+      if (dist < p.size * zoom + 10) {
+        clickedPlanet = p;
+        break;
+      }
+    }
+
+    // ⭐ Verifica luas (somente as que estão sendo desenhadas)
+    if (!clickedPlanet && !clickedSun) {
+      for (const p of planets) {
+        const isGeneralView = !focusedTarget;
+        const isFocusedThisPlanet =
+          focusedTarget &&
+          focusedTarget !== "sun" &&
+          (focusedTarget === p || (focusedTarget.planet === p));
+
+        const moonsToCheck = isGeneralView
+          ? (p.moons.length > 0 ? [p.moons[0]] : [])
+          : (isFocusedThisPlanet ? p.moons : []);
+
+        for (const moon of moonsToCheck) {
+          if (moon.screenX === undefined) continue;
+          const distM = Math.hypot(clickX - moon.screenX, clickY - moon.screenY);
+          if (distM < moon.size * zoom + 8) {
+            clickedMoon = moon;
+            break;
+          }
+        }
+        if (clickedMoon) break;
+      }
+    }
+  }
+
+  // Clique no vazio → visão geral
+  if (!clickedSun && !clickedPlanet && !clickedMoon) {
+    focusedTarget = null;
+    targetZoom = 1;
+    targetCamX = 0;
+    targetCamY = 0;
+    return;
+  }
+
+  // Clique no Sol
+  if (clickedSun) {
+    if (focusedTarget === "sun") {
+      focusedTarget = null;
+      targetZoom = 1;
+      targetCamX = 0;
+      targetCamY = 0;
+    } else {
+      focusedTarget = "sun";
+      targetZoom = 4.5;
+      targetCamX = 0;
+      targetCamY = 0;
+    }
+    return;
+  }
+
+  // ⭐ Clique em lua
+  if (clickedMoon) {
+    if (focusedTarget === clickedMoon) {
+      focusedTarget = null;
+      targetZoom = 1;
+      targetCamX = 0;
+      targetCamY = 0;
+    } else {
+      focusedTarget = clickedMoon;
+      targetZoom = 6; // um pouco mais perto que o planeta
+
+      if (typeof clickedMoon.worldX === "number" && typeof clickedMoon.worldY === "number") {
+        targetCamX = -clickedMoon.worldX;
+        targetCamY = -clickedMoon.worldY;
+      }
+    }
+    return;
+  }
+
+  // Clique em planeta
+  if (focusedTarget === clickedPlanet) {
+    focusedTarget = null;
+    targetZoom = 1;
+    targetCamX = 0;
+    targetCamY = 0;
+  } else {
+    focusedTarget = clickedPlanet;
+    targetZoom = 4.5;
+
+    if (typeof clickedPlanet.worldX === "number" && typeof clickedPlanet.worldY === "number") {
+      targetCamX = -clickedPlanet.worldX;
+      targetCamY = -clickedPlanet.worldY;
+    }
+  }
+});
+
+// 🔹 ESFERA COM SOMBRA / TEXTURA
+function drawShadedSphere(radius, baseColor, spinAngle) {
+  const lightRadius = radius * 0.3;
+  const lx = Math.cos(spinAngle) * radius * 0.5;
+  const ly = Math.sin(spinAngle) * radius * 0.5;
+
+  const gradient = ctx.createRadialGradient(
+    lx, ly, lightRadius * 0.2,
+    0, 0, radius
+  );
+
+  gradient.addColorStop(0, "rgba(255,255,255,0.95)");
+  gradient.addColorStop(0.3, baseColor);
+  gradient.addColorStop(0.8, shadeColor(baseColor, -30));
+  gradient.addColorStop(1, "rgba(0,0,0,0.9)");
+
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // “Texturinha” leve
+  ctx.save();
+  ctx.clip();
+  ctx.globalAlpha = 0.15;
+  ctx.lineWidth = radius * 0.15;
+  ctx.strokeStyle = "rgba(255,255,255,0.5)";
+  ctx.beginPath();
+  ctx.arc(0, radius * 0.3, radius * 0.9, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// escurece cor
+function shadeColor(hex, percent) {
+  const num = parseInt(hex.slice(1), 16);
+  let r = (num >> 16) & 255;
+  let g = (num >> 8) & 255;
+  let b = num & 255;
+
+  r = Math.min(255, Math.max(0, r + (255 * percent / 100)));
+  g = Math.min(255, Math.max(0, g + (255 * percent / 100)));
+  b = Math.min(255, Math.max(0, b + (255 * percent / 100)));
+
+  return `rgb(${r},${g},${b})`;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 🔹 FUNDO
+  let bgKey = null;
+  if (focusedTarget) {
+    if (focusedTarget === "sun") {
+      bgKey = "Sun";
+    } else if (focusedTarget.name) { // planeta
+      bgKey = focusedTarget.name;
+    } else if (focusedTarget.planet && focusedTarget.planet.name) { // ⭐ lua
+      bgKey = focusedTarget.planet.name;
+    }
+  }
+
+  if (bgKey && planetBackgrounds[bgKey] && planetBackgrounds[bgKey].loaded) {
+    const bg = planetBackgrounds[bgKey].img;
+    ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
+  } else {
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  ctx.save();
+
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.scale(zoom, zoom);
+  ctx.translate(camX, camY);
+
+  const now = performance.now();
+  const elapsedSeconds = (now - startTime) / 1000;
+  const simulatedDays = elapsedSeconds * DAYS_PER_SECOND;
+
+  // Coordenadas de tela do Sol (para clique)
+  sunScreenX = canvas.width / 2 + (0 + camX) * zoom;
+  sunScreenY = canvas.height / 2 + (0 + camY) * zoom;
+
+  // ÓRBITAS GERAIS (mais nítidas também)
+  if (!focusedTarget) {
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
+    ctx.lineWidth = 1.2 / zoom;
+    for (const p of planets) {
+      ctx.beginPath();
+      ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  // SOL
+  if (!focusedTarget || focusedTarget === "sun") {
+    ctx.save();
+    drawShadedSphere(SUN_RADIUS, "#ffcc66", sunSpinAngle);
+    ctx.restore();
+  }
+
+  // PLANETAS + ÓRBITAS DAS LUAS + LUAS
+  for (const p of planets) {
+    const orbitFraction = simulatedDays / p.periodDays;
+    const angle = orbitFraction * Math.PI * 2 + p.angleOffset;
+
+    const x = Math.cos(angle) * p.radius;
+    const y = Math.sin(angle) * p.radius;
+
+    p.worldX = x;
+    p.worldY = y;
+
+    const isGeneralView = !focusedTarget;
+    const isFocusedThisPlanet =
+      focusedTarget &&
+      focusedTarget !== "sun" &&
+      (focusedTarget === p || (focusedTarget.planet === p)); // ⭐ inclui foco em lua
+
+    const shouldDrawPlanet = isGeneralView || isFocusedThisPlanet;
+
+    // 🔹 decide quantas luas mostrar:
+    // visão geral → só 1
+    // planeta (ou lua desse planeta) focado → todas
+    const moonsToDraw = isGeneralView
+      ? (p.moons.length > 0 ? [p.moons[0]] : [])
+      : (isFocusedThisPlanet ? p.moons : []);
+
+    // 🔹 ÓRBITAS DAS LUAS
+    if (shouldDrawPlanet && moonsToDraw.length > 0) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.45)";
+      ctx.lineWidth = 1 / zoom;
+      for (const moon of moonsToDraw) {
+        ctx.beginPath();
+        ctx.arc(x, y, moon.orbitRadius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // 🔹 PLANETA
+    if (shouldDrawPlanet) {
+      ctx.save();
+      ctx.translate(x, y);
+      drawShadedSphere(p.size, p.color, p.spinAngle);
+      ctx.restore();
+    }
+
+    // 🔹 LUAS
+    for (const moon of moonsToDraw) {
+      const mOrbitFraction = simulatedDays / moon.periodDays;
+      const mAngle = mOrbitFraction * Math.PI * 2 + moon.angleOffset;
+
+      const mx = x + Math.cos(mAngle) * moon.orbitRadius;
+      const my = y + Math.sin(mAngle) * moon.orbitRadius;
+
+      // ⭐ guardamos posição mundial e planeta "mãe"
+      moon.worldX = mx;
+      moon.worldY = my;
+      moon.planet = p;
+
+      // desenha
+      ctx.save();
+      ctx.translate(mx, my);
+      drawShadedSphere(moon.size, "#d0d0d0", p.spinAngle + mAngle);
+      ctx.restore();
+
+      // ⭐ coordenadas de tela para clique
+      const moonScreenX = canvas.width / 2 + (mx + camX) * zoom;
+      const moonScreenY = canvas.height / 2 + (my + camY) * zoom;
+      moon.screenX = moonScreenX;
+      moon.screenY = moonScreenY;
+    }
+
+    // coordenadas para clique do planeta
+    const screenX = canvas.width / 2 + (x + camX) * zoom;
+    const screenY = canvas.height / 2 + (y + camY) * zoom;
+    p.screenX = screenX;
+    p.screenY = screenY;
+  }
+
+  ctx.restore();
+}
+
+// câmera chegou no alvo (bem preciso)
+function cameraAtTarget() {
+  const dz  = Math.abs(targetZoom - zoom);
+  const dcx = Math.abs(targetCamX - camX);
+  const dcy = Math.abs(targetCamY - camY);
+  return dz < 0.001 && dcx < 0.1 && dcy < 0.1;
+}
+
+// câmera quase chegando (usado para parar giro um pouco antes)
+function cameraAlmostAtTarget() {
+  const dz  = Math.abs(targetZoom - zoom);
+  const dcx = Math.abs(targetCamX - camX);
+  const dcy = Math.abs(targetCamY - camY);
+  return dz < 0.02 && dcx < 2 && dcy < 2;
+}
+
+function animate() {
+  zoom += (targetZoom - zoom) * 0.08;
+  camX += (targetCamX - camX) * 0.08;
+  camY += (targetCamY - camY) * 0.08;
+
+  const atTarget       = cameraAtTarget();
+  const almostAtTarget = cameraAlmostAtTarget();
+
+  // 🔹 GIRO: para um pouco antes de chegar
+  if (!focusedTarget) {
+    // visão geral → giro leve global
+    sunSpinAngle += 0.02;
+    for (const p of planets) {
+      p.spinAngle += 0.02;
+    }
+  } else {
+    if (focusedTarget === "sun") {
+      if (!almostAtTarget) {
+        sunSpinAngle += 0.2;
+      }
+    } else {
+      for (const p of planets) {
+        if (p === focusedTarget || (focusedTarget.planet === p)) { // ⭐ inclui lua focada
+          if (!almostAtTarget) {
+            p.spinAngle += 0.2;
+          }
+        }
+      }
+    }
+  }
+
+  draw();
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>

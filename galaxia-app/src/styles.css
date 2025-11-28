@@ -139,3 +139,61 @@
     opacity: 0.5;
   }
   
+  .luas-wrapper {
+  position: fixed;
+  inset: 0;
+  pointer-events: none; /* HUD não bloqueia clique, canvas sim */
+}
+
+/* o canvas recebe os cliques */
+.luas-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  pointer-events: auto;
+  background: #000;
+}
+
+.hud {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  font-size: 12px;
+  color: #aaa;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 6px 10px;
+  border-radius: 6px;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+.galaxia-wrapper {
+  position: fixed;
+  inset: 0;
+  pointer-events: none; /* HUD não bloqueia clique, só o canvas */
+}
+
+.solar-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  pointer-events: auto;
+  background: #000;
+}
+
+/* você pode reaproveitar a mesma .hud que já usa nas luas */
+.hud {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  font-size: 12px;
+  color: #aaa;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 6px 10px;
+  border-radius: 6px;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
