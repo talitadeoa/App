@@ -11,6 +11,7 @@ import LuasScreen from "./screens/LuasScreen";
 import SolScreen from "./screens/SolScreen";
 import SpaceScreen from "./screens/SpaceScreen";
 import EclipseScreen from "./screens/EclipseScreen";
+
 import AtomoScreen from "./screens/AtomoScreen";
 
 
@@ -31,7 +32,7 @@ const App: React.FC = () => {
       {currentScreen === SCREENS.GALAXIA && <GalaxiaScreen />}
       {currentScreen === SCREENS.LUAS && <LuasScreen />}
       {currentScreen === SCREENS.SOL && <SolScreen />}
-      {currentScreen === SCREENS.TERRA && <TerraScreen />}
+      {currentScreen === SCREENS.TERRA && <SpaceScreen />}
       {currentScreen === SCREENS.ECLIPSE && <EclipseScreen />}
       {currentScreen === SCREENS.ATOMO && <AtomoScreen />}
       {currentScreen === SCREENS.SPACE && <SpaceScreen />}
