@@ -1,32 +1,41 @@
-// App.tsx
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+// src/App.tsx
+import React, { useState } from "react";
+import "./styles.css";
 
-import HomeScreen from './src/screens/HomeScreen';
-import AtomoScreen from './src/screens/AtomoScreen';
-import SpaceScreen from './src/screens/SpaceScreen';
+import { SCREENS, ScreenId } from "./constants/screens";
 
-export type RootStackParamList = {
-  Home: undefined;
-  Atomo: undefined;
-  Space: undefined;
-};
+// Telas
+import HomeScreen from "./screens/HomeScreen";
+import GalaxiaScreen from "./screens/GalaxiaScreen";
+import LuasScreen from "./screens/LuasScreen";
+import SolScreen from "./screens/SolScreen";
+import SpaceScreen from "./screens/SpaceScreen";
+import EclipseScreen from "./screens/EclipseScreen";
+import AtomoScreen from "./screens/AtomoScreen";
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
+
+// Wrapper
+import ScreenWrapper from "./components/ScreenWrapper";
 
 const App: React.FC = () => {
+  const [currentScreen, setCurrentScreen] = useState<ScreenId>(SCREENS.HOME);
+
+  console.log("currentScreen:", currentScreen);
+
+  if (currentScreen === SCREENS.HOME) {
+    return <HomeScreen onSelectScreen={setCurrentScreen} />;
+  }
+
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName="Home"
-        screenOptions={{ headerShown: false }}
-      >
-        <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="Atomo" component={AtomoScreen} />
-        <Stack.Screen name="Space" component={SpaceScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <ScreenWrapper onBack={() => setCurrentScreen(SCREENS.HOME)}>
+      {currentScreen === SCREENS.GALAXIA && <GalaxiaScreen />}
+      {currentScreen === SCREENS.LUAS && <LuasScreen />}
+      {currentScreen === SCREENS.SOL && <SolScreen />}
+      {currentScreen === SCREENS.TERRA && <TerraScreen />}
+      {currentScreen === SCREENS.ECLIPSE && <EclipseScreen />}
+      {currentScreen === SCREENS.ATOMO && <AtomoScreen />}
+      {currentScreen === SCREENS.SPACE && <SpaceScreen />}
+    </ScreenWrapper>
   );
 };
 

@@ -2,8 +2,7 @@
 import { useState } from "react";
 
 // importe as imagens (ajuste os caminhos dos arquivos)
- import imgSpace from "./spacetwo.jpg";  // imagem 1
- import imgEarth from "./img/sunrise.jpg";         // imagem 2
+
 
 export default function SpaceScene() {
   const [view, setView] = useState("space"); // 'space' ou 'earth'
@@ -24,7 +23,6 @@ export default function SpaceScene() {
     // tela com a segunda imagem
     return (
       <div className="scene-container">
-        <img src={imgEarth} alt="Terra vista do espaço ao nascer do Sol" className="scene-image" />
         <button className="back-button" onClick={() => setView("space")}>
           Voltar para o espaço
         </button>
@@ -37,7 +35,6 @@ export default function SpaceScene() {
     <div className="scene-container">
       <div className="scene-wrapper">
         <img
-          src={imgSpace}
           alt="Terra, Lua e Sol no espaço"
           className="scene-image"
         />
