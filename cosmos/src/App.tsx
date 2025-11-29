@@ -1,9 +1,9 @@
 // src/App.tsx
 import React, { useState } from 'react';
 import { SphereId, SphereDefinition } from './types';
-import { Home } from './views/Home/Home';
-import { DetailView } from './views/DetailView/DetailView';
-import { StarBackground } from './components/StarBackground/StarBackground';
+import { Home } from './views/Home';
+import { DetailView } from './views/DetailView';
+import { StarBackground } from './components/StarBackground';
 
 const SPHERES: SphereDefinition[] = [
   { id: 'galaxia-maior', label: 'galáxia maior' },

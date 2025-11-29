@@ -1,7 +1,7 @@
 // src/views/DetailView/DetailView.tsx
 import React from 'react';
 import { SphereId } from '../../types';
-import { SolarSystem } from '../../components/SolarSystem/SolarSystem';
+import { SolarSystem } from '../../components/SolarSystem';
 
 interface DetailViewProps {
   sphereId: SphereId;

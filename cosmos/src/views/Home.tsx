@@ -1,7 +1,7 @@
 // src/views/Home/Home.tsx
 import React from 'react';
 import { SphereDefinition, SphereId } from '../../types';
-import { Sphere } from '../../components/Sphere/Sphere';
+import { Sphere } from '../../components/Sphere';
 
 interface HomeProps {
   spheres: SphereDefinition[];
