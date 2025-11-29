@@ -31,7 +31,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="app-root">
+    <div className="App-root">
       <StarBackground />
       {currentSphere === null ? (
         <Home
