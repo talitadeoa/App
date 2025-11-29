@@ -1,6 +1,5 @@
 // src/components/SolarSystem/SolarSystem.tsx
 import React, { useState, useCallback } from 'react';
-import styles from './SolarSystem.module.css';
 
 interface CSSVars extends React.CSSProperties {
   '--orbit-speed-factor'?: number;
@@ -14,13 +13,11 @@ export const SolarSystem: React.FC = () => {
   const handleMouseMove = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
       const rect = event.currentTarget.getBoundingClientRect();
-      const relX = (event.clientX - rect.left) / rect.width; // 0 - 1
-      const relY = (event.clientY - rect.top) / rect.height; // 0 - 1
+      const relX = (event.clientX - rect.left) / rect.width; // 0–1
+      const relY = (event.clientY - rect.top) / rect.height; // 0–1
 
-      // Mapear X para velocidade (um pouco mais rápido à direita)
-      const speed = 0.8 + relX * 0.6; // 0.8 a 1.4
-      // Mapear Y para wobble (mais wobble em cima/baixo)
-      const wobble = 0.8 + Math.abs(relY - 0.5) * 1.0; // 0.8 a 1.3
+      const speed = 0.8 + relX * 0.6; // 0.8–1.4
+      const wobble = 0.8 + Math.abs(relY - 0.5) * 1.0; // 0.8–1.3
 
       setOrbitSpeedFactor(speed);
       setWobbleFactor(wobble);
@@ -40,43 +37,44 @@ export const SolarSystem: React.FC = () => {
 
   return (
     <div
-      className={styles.systemWrapper}
+      className="system-wrapper"
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       style={styleVars}
     >
-      <div className={styles.system}>
-        <div className={styles.starCore} />
+      <div className="system">
+        <div className="star-core" />
 
-        <div className={styles.planetOrbit}>
-          <div className={styles.planet}>
-            <div className={styles.planetGlow} />
-
-            {/* 4 luas, com pequenas variações de raio e fase */}
-            <div className={`${styles.moonOrbit} ${styles.moonOrbit1}`}>
-              <div className={styles.moonInner}>
-                <div className={styles.moon} />
+        <div className="planet-orbit">
+          <div className="planet">
+            {/* 4 luas, órbitas trocoidais aproximadas */}
+            <div className="moon-orbit moon-orbit-1">
+              <div className="moon-inner">
+                <div className="moon" />
               </div>
             </div>
-            <div className={`${styles.moonOrbit} ${styles.moonOrbit2}`}>
-              <div className={styles.moonInner}>
-                <div className={styles.moon} />
+            <div className="moon-orbit moon-orbit-2">
+              <div className="moon-inner">
+                <div className="moon" />
               </div>
             </div>
-            <div className={`${styles.moonOrbit} ${styles.moonOrbit3}`}>
-              <div className={styles.moonInner}>
-                <div className={styles.moon} />
+            <div className="moon-orbit moon-orbit-3">
+              <div className="moon-inner">
+                <div className="moon" />
               </div>
             </div>
-            <div className={`${styles.moonOrbit} ${styles.moonOrbit4}`}>
-              <div className={styles.moonInner}>
-                <div className={styles.moon} />
+            <div className="moon-orbit moon-orbit-4">
+              <div className="moon-inner">
+                <div className="moon" />
               </div>
             </div>
           </div>
         </div>
       </div>
-      <p className={styles.hint}>mova o cursor: as luas escutam o seu gesto.</p>
+
+      <p className="solar-hint">
+        mova o cursor: as luas escutam o seu gesto.
+      </p>
     </div>
   );
 };

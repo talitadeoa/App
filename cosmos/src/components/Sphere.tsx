@@ -1,6 +1,5 @@
 // src/components/Sphere/Sphere.tsx
 import React from 'react';
-import styles from './Sphere.module.css';
 import { SphereId } from '../../types';
 
 export interface SphereProps {
@@ -10,19 +9,24 @@ export interface SphereProps {
   isZooming?: boolean;
 }
 
-export const Sphere: React.FC<SphereProps> = ({ id, label, onClick, isZooming }) => {
+export const Sphere: React.FC<SphereProps> = ({
+  id,
+  label,
+  onClick,
+  isZooming,
+}) => {
   const handleClick = () => {
     onClick(id);
   };
 
   return (
     <button
-      className={`${styles.sphere} ${isZooming ? styles.sphereZooming : ''}`}
-      onClick={handleClick}
       type="button"
+      className={`sphere ${isZooming ? 'zooming' : ''}`}
+      onClick={handleClick}
     >
-      <div className={styles.core} />
-      <span className={styles.label}>{label}</span>
+      <div className="sphere-core" />
+      <span className="sphere-label">{label}</span>
     </button>
   );
 };

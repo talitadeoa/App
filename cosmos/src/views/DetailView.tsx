@@ -1,6 +1,5 @@
 // src/views/DetailView/DetailView.tsx
 import React from 'react';
-import styles from './DetailView.module.css';
 import { SphereId } from '../../types';
 import { SolarSystem } from '../../components/SolarSystem/SolarSystem';
 
@@ -18,19 +17,22 @@ const labelMap: Record<SphereId, string> = {
   terra: 'terra',
 };
 
-export const DetailView: React.FC<DetailViewProps> = ({ sphereId, onBack }) => {
+export const DetailView: React.FC<DetailViewProps> = ({
+  sphereId,
+  onBack,
+}) => {
   const label = labelMap[sphereId];
 
   return (
-    <div className={styles.container}>
-      <header className={styles.header}>
-        <button className={styles.backButton} type="button" onClick={onBack}>
+    <div className="detail-container">
+      <header className="detail-header">
+        <button type="button" onClick={onBack}>
           ← voltar
         </button>
       </header>
 
-      <section className={styles.content}>
-        <div className={styles.textBlock}>
+      <section className="detail-content">
+        <div className="detail-text">
           <h2>{label}</h2>
           <p>
             você atravessou o espaço e caiu nesse pequeno sistema solar.

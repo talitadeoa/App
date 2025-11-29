@@ -1,6 +1,5 @@
 // src/views/Home/Home.tsx
 import React from 'react';
-import styles from './Home.module.css';
 import { SphereDefinition, SphereId } from '../../types';
 import { Sphere } from '../../components/Sphere/Sphere';
 
@@ -10,18 +9,22 @@ interface HomeProps {
   zoomingSphere: SphereId | null;
 }
 
-export const Home: React.FC<HomeProps> = ({ spheres, onSphereClick, zoomingSphere }) => {
+export const Home: React.FC<HomeProps> = ({
+  spheres,
+  onSphereClick,
+  zoomingSphere,
+}) => {
   const isBackgroundBlurred = Boolean(zoomingSphere);
 
   return (
-    <div className={styles.container}>
-      <div className={styles.overlayTitle}>
+    <div className="home-container">
+      <div className="home-title">
         <h1>cosmos íntimo</h1>
         <p>toque em uma esfera para entrar na sua órbita.</p>
       </div>
 
       <div
-        className={`${styles.sphereGrid} ${isBackgroundBlurred ? styles.blurred : ''}`}
+        className={`sphere-grid ${isBackgroundBlurred ? 'blurred' : ''}`}
       >
         {spheres.map((sphere) => (
           <Sphere

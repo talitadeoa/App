@@ -1,6 +1,5 @@
 // src/components/StarBackground/StarBackground.tsx
 import React, { useMemo } from 'react';
-import styles from './StarBackground.module.css';
 
 interface Star {
   id: number;
@@ -30,11 +29,11 @@ export const StarBackground: React.FC = () => {
   const stars = useMemo(() => generateStars(140), []);
 
   return (
-    <div className={styles.sky}>
+    <div className="sky">
       {stars.map((star) => (
         <div
           key={star.id}
-          className={styles.star}
+          className="star"
           style={
             {
               top: `${star.top}%`,

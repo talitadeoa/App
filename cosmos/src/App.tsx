@@ -20,14 +20,13 @@ export const App: React.FC = () => {
 
   const handleSphereClick = (id: SphereId) => {
     setZoomingSphere(id);
-    // Espera a animação de zoom antes de trocar para a tela de detalhe
     setTimeout(() => {
       setCurrentSphere(id);
       setZoomingSphere(null);
     }, 700);
   };
 
-  const handleBackToHome = () => {
+  const handleBack = () => {
     setCurrentSphere(null);
   };
 
@@ -41,7 +40,7 @@ export const App: React.FC = () => {
           zoomingSphere={zoomingSphere}
         />
       ) : (
-        <DetailView sphereId={currentSphere} onBack={handleBackToHome} />
+        <DetailView sphereId={currentSphere} onBack={handleBack} />
       )}
     </div>
   );
